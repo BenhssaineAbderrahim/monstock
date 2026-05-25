@@ -201,6 +201,63 @@
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Modal overlay */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.75);
+    display: flex; align-items: flex-end; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--bg2); border-radius: 24px 24px 0 0;
+    border: 1px solid var(--border); border-bottom: none;
+    width: 100%; max-width: 520px;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    overflow: hidden;
+    max-height: 90dvh;
+    display: flex; flex-direction: column;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+
+  .modal-handle {
+    width: 40px; height: 4px; border-radius: 2px;
+    background: var(--border); margin: 12px auto 0;
+    flex-shrink: 0;
+  }
+
+  .modal-photo {
+    width: 100%; height: 220px; object-fit: cover;
+    flex-shrink: 0;
+  }
+  .modal-photo-placeholder {
+    width: 100%; height: 160px; background: var(--bg3);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .modal-photo-placeholder svg { width: 48px; height: 48px; color: var(--text2); opacity: 0.4; }
+
+  .modal-body { padding: 20px 20px 32px; overflow-y: auto; }
+  .modal-name {
+    font-size: 22px; font-weight: 700; line-height: 1.2;
+    margin-bottom: 8px; letter-spacing: -0.3px;
+  }
+  .modal-price {
+    font-size: 32px; font-weight: 800; color: var(--green);
+    letter-spacing: -1px; margin-bottom: 4px;
+  }
+  .modal-price span { font-size: 18px; font-weight: 500; }
+  .modal-date { font-size: 12px; color: var(--text2); margin-bottom: 20px; }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .modal-actions .btn { flex: 1; padding: 13px; font-size: 14px; }
+  .btn-danger { background: rgba(233,69,96,0.15); color: var(--accent); border: 1px solid rgba(233,69,96,0.3); }
+  .btn-danger:active { background: rgba(233,69,96,0.25); }
 </style>
 </head>
 <body>
@@ -304,6 +361,23 @@
   <div id="page-list" class="page">
     <div class="section-title">Tous les produits</div>
     <div id="all-products" class="product-list"></div>
+  </div>
+</div>
+
+<!-- Product Detail Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-handle"></div>
+    <div id="modal-photo-wrap"></div>
+    <div class="modal-body">
+      <div class="modal-name" id="modal-name"></div>
+      <div class="modal-price" id="modal-price"></div>
+      <div class="modal-date" id="modal-date"></div>
+      <div class="modal-actions">
+        <button class="btn btn-danger" id="modal-delete-btn" onclick="deleteFromModal()">🗑 Supprimer</button>
+        <button class="btn btn-secondary" onclick="closeModal()">Fermer</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -518,7 +592,7 @@ function renderProducts(list, container, highlight) {
     const thumb = p.photo
       ? `<img src="${p.photo}" alt="">`
       : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
-    return `<div class="product-card">
+    return `<div class="product-card" onclick="openModal(${p.id})">
       <div class="product-thumb">${thumb}</div>
       <div class="product-info">
         <div class="product-name">${nameHtml}</div>
@@ -568,6 +642,61 @@ function switchTab(tab) {
   if (tab === 'list') renderAll();
   if (tab === 'search') document.getElementById('search-input').focus();
 }
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+let modalProductId = null;
+
+function openModal(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  modalProductId = id;
+
+  document.getElementById('modal-name').textContent = p.name;
+  document.getElementById('modal-price').innerHTML = `${p.price.toLocaleString('fr-MA')} <span>DH</span>`;
+  document.getElementById('modal-date').textContent = `Ajouté le ${p.date}`;
+
+  const photoWrap = document.getElementById('modal-photo-wrap');
+  if (p.photo) {
+    photoWrap.innerHTML = `<img class="modal-photo" src="${p.photo}" alt="${p.name}">`;
+  } else {
+    photoWrap.innerHTML = `<div class="modal-photo-placeholder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+    </div>`;
+  }
+
+  document.getElementById('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  modalProductId = null;
+}
+
+function deleteFromModal() {
+  if (!modalProductId) return;
+  if (!confirm('Supprimer ce produit ?')) return;
+  products = products.filter(p => p.id !== modalProductId);
+  localStorage.setItem('monstock_products', JSON.stringify(products));
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  modalProductId = null;
+  showToast('Produit supprimé', '');
+  updateBadge();
+  if (document.getElementById('page-list').classList.contains('active')) renderAll();
+  if (document.getElementById('page-search').classList.contains('active')) doSearch();
+}
+
+// close on back button (Android)
+window.addEventListener('popstate', () => {
+  if (document.getElementById('modal-overlay').classList.contains('open')) {
+    document.getElementById('modal-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+    modalProductId = null;
+  }
+});
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 function showToast(msg, type) {
