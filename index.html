@@ -389,6 +389,20 @@ let currentPhoto = null;
 let recognition = null;
 let activeVoiceTarget = null;
 
+// ─── Event delegation for product cards ───────────────────────────────────────
+document.addEventListener('click', (e) => {
+  const delBtn = e.target.closest('[data-del]');
+  if (delBtn) {
+    e.stopPropagation();
+    deleteProduct(parseInt(delBtn.dataset.del), e);
+    return;
+  }
+  const card = e.target.closest('.product-card[data-id]');
+  if (card) {
+    openModal(parseInt(card.dataset.id));
+  }
+});
+
 // ─── Word-to-number parser (French + Darija-friendly) ─────────────────────────
 const wordMap = {
   zéro:0,zero:0,un:1,une:1,deux:2,trois:3,quatre:4,cinq:5,six:6,sept:7,huit:8,neuf:9,
@@ -442,7 +456,7 @@ function setupRecognition() {
   const r = new SR();
   r.continuous = false;
   r.interimResults = true;
-  r.lang = 'fr-FR';
+  r.lang = 'ar-MA';
   return r;
 }
 
@@ -592,14 +606,14 @@ function renderProducts(list, container, highlight) {
     const thumb = p.photo
       ? `<img src="${p.photo}" alt="">`
       : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
-    return `<div class="product-card" onclick="openModal(${p.id})">
+    return `<div class="product-card" data-id="${p.id}">
       <div class="product-thumb">${thumb}</div>
       <div class="product-info">
         <div class="product-name">${nameHtml}</div>
         <div class="product-price">${p.price.toLocaleString('fr-MA')} DH</div>
         <div class="product-date">${p.date}</div>
       </div>
-      <div class="product-delete" onclick="deleteProduct(${p.id}, event)">
+      <div class="product-delete" data-del="${p.id}">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
       </div>
     </div>`;
