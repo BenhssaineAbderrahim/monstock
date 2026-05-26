@@ -455,8 +455,8 @@ function setupRecognition() {
   if (!SR) return null;
   const r = new SR();
   r.continuous = false;
-  r.interimResults = true;
-  r.lang = 'ar-MA';
+  r.interimResults = false;
+  r.lang = 'fr-FR';
   return r;
 }
 
@@ -481,23 +481,21 @@ function startVoice(target) {
   if (labelEl) labelEl.textContent = '🎙️ En écoute...';
 
   recognition.onresult = (e) => {
-    const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
-    
+    const transcript = e.results[0][0].transcript;
+
     if (target === 'name') {
       document.getElementById('transcript-name').textContent = transcript;
       document.getElementById('transcript-name').classList.add('has-text');
-      if (e.results[0].isFinal) document.getElementById('input-name').value = transcript;
+      document.getElementById('input-name').value = transcript;
     } else if (target === 'price') {
       document.getElementById('transcript-price').textContent = transcript;
       document.getElementById('transcript-price').classList.add('has-text');
-      if (e.results[0].isFinal) {
-        const price = parsePrice(transcript);
-        document.getElementById('price-hint').textContent = price ? `✓ Interprété : ${price} DH` : '⚠ Prix non reconnu, tapez manuellement';
-        if (price) document.getElementById('input-price').value = price;
-      }
+      const price = parsePrice(transcript);
+      document.getElementById('price-hint').textContent = price ? `✓ Interprété : ${price} DH` : '⚠ Prix non reconnu, tapez manuellement';
+      if (price) document.getElementById('input-price').value = price;
     } else if (target === 'search') {
       document.getElementById('search-input').value = transcript;
-      if (e.results[0].isFinal) doSearch();
+      doSearch();
     }
     updateStep();
   };
@@ -524,20 +522,28 @@ function handlePhoto(e) {
   const reader = new FileReader();
   reader.onload = (ev) => {
     currentPhoto = ev.target.result;
-    const area = document.getElementById('photo-area');
-    area.innerHTML = `<img src="${currentPhoto}" alt="Photo produit">`;
+    document.getElementById('photo-preview').src = currentPhoto;
+    document.getElementById('photo-preview').style.display = 'block';
+    document.getElementById('photo-placeholder-inner').style.display = 'none';
+    updateStep();
   };
   reader.readAsDataURL(file);
 }
 
 // ─── Save Product ─────────────────────────────────────────────────────────────
+let isSaving = false;
 function saveProduct() {
+  if (isSaving) return;
   const name = document.getElementById('input-name').value.trim();
   const priceRaw = document.getElementById('input-price').value;
   const price = parseFloat(priceRaw);
 
   if (!name) { showToast('⚠ Entrez le nom du produit', 'error'); return; }
   if (!priceRaw || isNaN(price) || price <= 0) { showToast('⚠ Entrez un prix valide', 'error'); return; }
+
+  isSaving = true;
+  const btn = document.querySelector('.btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
 
   const product = {
     id: Date.now(),
@@ -549,9 +555,16 @@ function saveProduct() {
 
   products.unshift(product);
   localStorage.setItem('monstock_products', JSON.stringify(products));
-  showToast(`✅ "${name}" ajouté — ${price} DH`, 'success');
-  resetForm();
   updateBadge();
+  const savedName = name;
+  const savedPrice = price;
+  resetForm();
+  showToast(`✅ "${savedName}" ajouté — ${savedPrice} DH`, 'success');
+
+  setTimeout(() => {
+    isSaving = false;
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Sauvegarder'; }
+  }, 1000);
 }
 
 function resetForm() {
@@ -562,12 +575,9 @@ function resetForm() {
   document.getElementById('transcript-price').textContent = 'En attente...';
   document.getElementById('transcript-price').classList.remove('has-text');
   document.getElementById('price-hint').textContent = '';
-  document.getElementById('photo-input').value = '';
-  document.getElementById('photo-area').innerHTML = `
-    <div class="photo-placeholder">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-      <span>Ajouter une photo</span>
-    </div>`;
+  try { document.getElementById('photo-input').value = ''; } catch(e) {}
+  document.getElementById('photo-preview').style.display = 'none';
+  document.getElementById('photo-placeholder-inner').style.display = 'flex';
   currentPhoto = null;
   updateStep();
 }
